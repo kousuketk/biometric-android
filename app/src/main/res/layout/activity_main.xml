@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <TextView
+                android:id="@+id/app_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Biometric Demo"
+                android:textSize="28sp"
+                android:textStyle="bold" />
+
+            <!-- Result first: an automated test can assert on it without scrolling. -->
+            <TextView style="@style/SectionHeader" android:text="Result" />
+
+            <TextView
+                android:id="@+id/result_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="IDLE"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/result_detail"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:text="-"
+                android:textIsSelectable="true"
+                android:textSize="12sp" />
+
+            <LinearLayout style="@style/Row">
+                <TextView style="@style/RowLabel" android:text="Terminal results" />
+                <TextView
+                    android:id="@+id/attempt_count_value"
+                    style="@style/RowValue"
+                    android:text="0" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/Row">
+                <TextView style="@style/RowLabel" android:text="Non-matching scans" />
+                <TextView
+                    android:id="@+id/failed_scan_count_value"
+                    style="@style/RowValue"
+                    android:text="0" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/reset_button"
+                style="@style/Action"
+                android:text="Reset" />
+
+            <TextView style="@style/SectionHeader" android:text="Device state" />
+
+            <LinearLayout style="@style/Row">
+                <TextView style="@style/RowLabel" android:text="API level" />
+                <TextView android:id="@+id/api_level_value" style="@style/RowValue" android:text="-" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/Row">
+                <TextView style="@style/RowLabel" android:text="BIOMETRIC_STRONG" />
+                <TextView android:id="@+id/can_authenticate_strong_value" style="@style/RowValue" android:text="-" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/Row">
+                <TextView style="@style/RowLabel" android:text="BIOMETRIC_WEAK" />
+                <TextView android:id="@+id/can_authenticate_weak_value" style="@style/RowValue" android:text="-" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/Row">
+                <TextView style="@style/RowLabel" android:text="DEVICE_CREDENTIAL" />
+                <TextView android:id="@+id/can_authenticate_credential_value" style="@style/RowValue" android:text="-" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/Row">
+                <TextView style="@style/RowLabel" android:text="Keystore key" />
+                <TextView android:id="@+id/keystore_key_value" style="@style/RowValue" android:text="-" />
+            </LinearLayout>
+
+            <Button android:id="@+id/refresh_button" style="@style/Action" android:text="Refresh" />
+
+            <TextView style="@style/SectionHeader" android:text="BiometricPrompt" />
+
+            <Button android:id="@+id/auth_strong_button" style="@style/Action" android:text="Strong (Class 3)" />
+            <Button android:id="@+id/auth_strong_crypto_button" style="@style/Action" android:text="Strong + CryptoObject" />
+            <Button android:id="@+id/auth_weak_button" style="@style/Action" android:text="Weak (Class 2)" />
+            <Button android:id="@+id/auth_strong_or_credential_button" style="@style/Action" android:text="Biometrics or device credential" />
+
+            <TextView style="@style/SectionHeader" android:text="Keystore" />
+
+            <Button android:id="@+id/keystore_create_button" style="@style/Action" android:text="Create key" />
+            <Button android:id="@+id/keystore_delete_button" style="@style/Action" android:text="Delete key" />
+
+            <TextView style="@style/SectionHeader" android:text="Launch gate" />
+
+            <CheckBox
+                android:id="@+id/gate_toggle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Require auth on next launch" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <LinearLayout
+        android:id="@+id/gate_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?android:attr/colorBackground"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/gate_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Locked"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/gate_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:text="IDLE"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/gate_detail"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="monospace"
+            android:gravity="center"
+            android:text="-"
+            android:textSize="12sp" />
+
+        <Button android:id="@+id/gate_unlock_button" style="@style/Action" android:text="Unlock" />
+        <Button android:id="@+id/gate_disable_button" style="@style/Action" android:text="Disable gate" />
+    </LinearLayout>
+
+</FrameLayout>
