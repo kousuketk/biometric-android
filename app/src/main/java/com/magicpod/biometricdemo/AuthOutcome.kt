@@ -25,6 +25,14 @@ enum class AuthOutcome(val code: String) {
 
     /** The Keystore key was invalidated because the enrolled biometrics changed. */
     KEY_INVALIDATED("KEY_INVALIDATED"),
+
+    /**
+     * BiometricPrompt reported success, but the Keystore-backed cipher then refused to run. That
+     * means no valid Hardware Auth Token reached Keystore -- the case a fake HAL, or an enrollment
+     * written with a stale gatekeeper SID, produces. Reporting it as SUCCESS would hide exactly
+     * what this app exists to detect.
+     */
+    CRYPTO_FAILED("CRYPTO_FAILED"),
     ERROR("ERROR");
 
     companion object {

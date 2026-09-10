@@ -105,12 +105,26 @@ Both are **Class 3 (`oemStrength: 15`)**. The fingerprint HAL is `ranchu`, so th
 `persist.vendor.fingerprint.virtual.*` properties do nothing — but the **face** HAL is the AOSP
 example one, and it ships pre-configured with `persist.vendor.face.virtual.strength=strong`.
 
-Note that an API 36 `google_apis_playstore` emulator showed **only** the fingerprint sensor, so the
-face sensor is not guaranteed across device profiles / images. Check per image before relying on it.
+**The face sensor disappeared somewhere between API 34 and API 36.** Measured with everything else
+held constant (`google_apis`, arm64-v8a, freshly created AVDs):
 
-### 2. Face enrollment needs no UI at all
+| API | AVD device profile | face sensor |
+|---|---|---|
+| 34 | `pixel_6` | present |
+| 34 | `pixel` | present |
+| 36 | `pixel` | **absent** |
 
-This is the whole reason the face path matters. Enrollment, end to end:
+`pm list features` agrees: API 34 reports both `android.hardware.biometrics.face` and
+`android.hardware.fingerprint`, API 36 only the latter. The device profile makes no difference, so
+this is Google dropping the virtual face HAL from newer emulator images, not a configuration knob.
+(API 35 is untested.)
+
+Anything built on the face path therefore stops working on new platform versions, which rules it
+out as the primary approach even though enrollment is far cheaper there.
+
+### 2. Face enrollment needs no UI at all -- but only on images that still have the sensor
+
+This is the one appealing thing about the face path, subject to finding 1. Enrollment, end to end:
 
 ```bash
 adb root
@@ -208,21 +222,63 @@ create a rootable one (`google_apis`, not `google_apis_playstore`), read the id 
 to the step as an explicit finger id. That is confirmed to work, but it only helps a hand-built
 emulator.
 
-`scripts/enroll-fingerprint.sh` does this end to end and needs no root:
+### 7. The enrollment can be written straight into the HAL's data file (no UI at all)
+
+Better than driving the wizard, when `adb root` is available. The ranchu HAL keeps its enrollments
+in one file, `/data/vendor_de/<user>/fpdata/sensor<sensorId>.bin`. Writing that file and then
+running `cmd fingerprint sync` -- which makes the framework re-enumerate the HAL and reconcile its
+records -- *is* the register/delete operation.
+
+`scripts/set-fingerprint.sh` implements it:
 
 ```bash
-./scripts/enroll-fingerprint.sh emulator-5554 1 1234
+./scripts/set-fingerprint.sh register emulator-5554 1 1234
+./scripts/set-fingerprint.sh delete   emulator-5554
+./scripts/set-fingerprint.sh status   emulator-5554
+```
+
+25 bytes for a single enrollment:
+
+| offset | size | field |
+| --- | --- | --- |
+| 0 | 4 | magic `arPF` |
+| 4 | 8 | authenticator ID, u64 LE — arbitrary |
+| 12 | 8 | **gatekeeper SID**, u64 LE — must be the target device's, from `dumpsys lock_settings` |
+| 20 | 1 | enrollment count, u8 |
+| 21 | 4 × count | enrollment IDs, u32 LE |
+
+Verified on `android-34;google_apis;arm64-v8a`: registers (`"count":1`), authenticates
+(`adb emu finger touch 1`), **passes crypto-bound authentication**
+(`mode=STRONG_CRYPTO cryptoBytes=16`, `"acceptCrypto":1`), and deletes again (`"count":0`).
+That last point is what the virtual face HAL cannot do (finding 5).
+
+Constraints and traps:
+
+- Needs `adb root`, so `google_apis` only — `google_apis_playstore` images are user builds.
+  Fall back to `scripts/enroll-fingerprint-via-ui.sh` there.
+- AOSP's generic `persist.vendor.fingerprint.virtual.*` properties do **not** work: the ranchu HAL
+  ignores them and `sync` reports no enrollments. Only the file route works.
+- `settings put secure biometric_virtual_enabled 1` is required by `cmd fingerprint sync`, and it
+  does **not** survive a reboot. Without it `sync` is a silent no-op.
+- Write the *target device's* gatekeeper SID. A file carrying someone else's SID still shows as
+  enrolled and still unlocks the keyguard, but crypto-bound authentication fails with
+  `KEY_USER_NOT_AUTHENTICATED`.
+- Set the credential first: changing it afterwards drops the enrollment count to 0.
+- `restorecon` matters — a wrong SELinux label looks exactly like "no enrollments".
+- Generate the Keystore key *after* installing the file.
+
+### 8. Wizard automation, as the no-root fallback
+
+`scripts/enroll-fingerprint-via-ui.sh` walks the enrollment wizard instead, and needs no root, so
+it also covers `google_apis_playstore`:
+
+```bash
+./scripts/enroll-fingerprint-via-ui.sh emulator-5554 1 1234
 ```
 
 It clears the existing credential (which drops any existing enrollment), sets a PIN, walks the
-enrollment wizard, and drives the touches with `adb emu finger touch 1`. Verified on
-`android-34;google_apis;arm64-v8a`: the enrolled id comes out as
-
-```
-<fingerprint fingerId="1" name="Finger 1" groupId="0" deviceId="0" />
-```
-
-and `adb emu finger touch 1` then authenticates (`"accept":1,"reject":0`).
+wizard, and drives the touches with `adb emu finger touch 1` — which is what pins the id to 1.
+Verified on `android-34;google_apis;arm64-v8a`.
 
 Two things that cost time while writing it, in case the wizard changes again:
 
@@ -231,13 +287,70 @@ Two things that cost time while writing it, in case the wizard changes again:
 - `locksettings clear --old <pin>` removes the biometric enrollments along with the credential, and
   needs no root -- handy for resetting between runs.
 
-**Note for provisioning:** reading the id needs root, but *enrolling* does not — the wizard is
-driven with `am start`, `input tap` and `adb emu finger touch`, all of which work on a user build.
-So emulator provisioning can pin the id to 1 on any image, including `google_apis_playstore`, and
-then no one has to look the id up at all.
+### 9. Send the scan only once the prompt is actually up
+
+A touch posted before `BiometricPrompt` has focus is dropped, and the attempt then ends as
+`ERROR_USER_CANCELED(10)` with `"acquire":0` — no scan ever reached the HAL. Waiting for the window
+first makes it deterministic:
+
+```bash
+until adb shell dumpsys window | grep -q "mCurrentFocus=Window{.*BiometricPrompt}"; do sleep 1; done
+adb emu finger touch 1
+```
+
+Same shape as the iOS timing caveat: the match event is a sensor signal, not a request.
+
+### 10. Whether crypto-bound authentication needs a screen lock depends on the Android version
+
+Writing the enrollment file bypasses the framework's enrollment flow, so it also bypasses that
+flow's precondition: normally Android forces a screen lock to be set before any biometric can be
+enrolled. The result is a state a real device cannot be in -- a biometric enrolled with no
+credential -- and platform versions disagree about what that means for Keystore.
+
+Measured with `STRONG_CRYPTO` (a Keystore key created with `setUserAuthenticationRequired(true)`,
+handed to `BiometricPrompt` as a `CryptoObject`):
+
+| API | screen lock | result |
+| --- | --- | --- |
+| 34 | set | `SUCCESS ... cryptoBytes=16` |
+| 34 | none | `ERROR ... java.security.ProviderException: Keystore key generation failed` |
+| 36 | none | `SUCCESS ... cryptoBytes=16` |
+
+On API 34 the key cannot even be generated without a credential; on API 36 it can. Plain
+(non-crypto) `BiometricPrompt` succeeds in every one of those combinations, so the gap only shows
+up in the banking-app shape -- which is exactly the case worth testing.
+
+Practically: set a credential before enrolling, and mind the order, because changing the
+credential drops the enrollment count back to 0.
+
+```bash
+adb shell locksettings set-pin 1234
+adb shell locksettings verify --old 1234              # set-pin reports success even when it failed
+adb shell settings put system screen_off_timeout 1800000   # keep the lock screen from eating taps
+# only now enroll
+./scripts/set-fingerprint.sh register <serial> 1 1234
+```
+
+### 11. The enrollment technique only works on the AIDL-era HAL (API 34+)
+
+API 33 and older emulator images ship the HIDL fingerprint HAL, and none of the file-based approach
+applies to it:
+
+| API | init service | provider reported by `dumpsys fingerprint` | generation |
+| --- | --- | --- | --- |
+| 33 | `vendor.fps_hal` | `Fingerprint21` | HIDL |
+| 34+ | `vendor.biometrics.fingerprint-service.ranchu` | `FingerprintProvider` | AIDL |
+
+On API 33 the binary is `/vendor/bin/hw/android.hardware.biometrics.fingerprint@2.1-service` and
+`/data/vendor_de/0/fpdata/` is empty, so both the service name and the storage layout differ.
+Stopping the AIDL service name there fails with `Unable to stop service`, which says nothing about
+the real cause -- so check `provider: FingerprintProvider` before touching anything.
 
 ## Next
 
-- Decide whether emulator provisioning enrolls a face (cheap, no UI, no CryptoObject)
-  or a fingerprint (UI automation needed, full CryptoObject support)
+- Fingerprint is the only viable path: face is gone from API 36 images, cannot unlock Keystore
+  keys, and does not reflect how real Android users authenticate.
+- On rootable images, provision with `scripts/set-fingerprint.sh` (finding 7) rather than the
+  wizard; it also makes enroll/unenroll cheap enough to do inside a test.
+- Either way, verify the result with `dumpsys fingerprint` instead of assuming it worked.
 - Wire the steps up against `../biometric-ios` for the iOS half

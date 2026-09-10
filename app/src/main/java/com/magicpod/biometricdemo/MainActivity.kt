@@ -148,11 +148,18 @@ class MainActivity : AppCompatActivity() {
                 BiometricPrompt.AUTHENTICATION_RESULT_TYPE_DEVICE_CREDENTIAL -> "DEVICE_CREDENTIAL"
                 else -> "UNKNOWN"
             }
-            val payload = result.cryptoObject?.cipher?.let { cipher ->
-                runCatching { cipher.doFinal(KeystoreStore.PLAINTEXT.toByteArray()).size }
-                    .fold({ " cryptoBytes=$it" }, { " cryptoFailed=$it" })
-            } ?: ""
-            finishWith(AuthOutcome.SUCCESS, "mode=$mode via=$via$payload")
+            val cipher = result.cryptoObject?.cipher
+            if (cipher == null) {
+                finishWith(AuthOutcome.SUCCESS, "mode=$mode via=$via")
+                return
+            }
+            // Run the crypto operation the authentication was supposed to unlock. If it throws,
+            // the authentication only looked successful, so do not report SUCCESS.
+            runCatching { cipher.doFinal(KeystoreStore.PLAINTEXT.toByteArray()).size }
+                .fold(
+                    { finishWith(AuthOutcome.SUCCESS, "mode=$mode via=$via cryptoBytes=$it") },
+                    { finishWith(AuthOutcome.CRYPTO_FAILED, "mode=$mode via=$via cryptoFailed=$it") },
+                )
         }
 
         override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
