@@ -1,6 +1,5 @@
 package com.magicpod.biometricdemo
 
-import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 
 /**
@@ -69,19 +68,6 @@ enum class AuthOutcome(val code: String) {
             BiometricPrompt.ERROR_NO_DEVICE_CREDENTIAL -> "ERROR_NO_DEVICE_CREDENTIAL"
             BiometricPrompt.ERROR_SECURITY_UPDATE_REQUIRED -> "ERROR_SECURITY_UPDATE_REQUIRED"
             else -> "UNKNOWN"
-        }
-
-        /** Renders the result of [BiometricManager.canAuthenticate] for the device-state panel. */
-        fun canAuthenticateName(status: Int): String = when (status) {
-            BiometricManager.BIOMETRIC_SUCCESS -> "OK"
-            BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> "NG BIOMETRIC_ERROR_NO_HARDWARE"
-            BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> "NG BIOMETRIC_ERROR_HW_UNAVAILABLE"
-            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> "NG BIOMETRIC_ERROR_NONE_ENROLLED"
-            BiometricManager.BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED ->
-                "NG BIOMETRIC_ERROR_SECURITY_UPDATE_REQUIRED"
-            BiometricManager.BIOMETRIC_ERROR_UNSUPPORTED -> "NG BIOMETRIC_ERROR_UNSUPPORTED"
-            BiometricManager.BIOMETRIC_STATUS_UNKNOWN -> "NG BIOMETRIC_STATUS_UNKNOWN"
-            else -> "NG ($status)"
         }
     }
 }

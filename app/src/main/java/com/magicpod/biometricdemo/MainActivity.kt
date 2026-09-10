@@ -5,7 +5,6 @@ import android.os.Build
 import android.os.Bundle
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_STRONG
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
 import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
@@ -39,7 +38,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         options = LaunchOptions(intent)
 
-        binding.refreshButton.setOnClickListener { refreshDeviceState() }
         binding.resetButton.setOnClickListener { reset() }
         binding.authStrongButton.setOnClickListener { authenticate(AuthMode.STRONG) }
         binding.authStrongCryptoButton.setOnClickListener { authenticate(AuthMode.STRONG_CRYPTO) }
@@ -60,7 +58,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         applyLaunchOptions()
-        refreshDeviceState()
         render()
         renderGate()
         if (gateActive) authenticateForGate()
@@ -71,20 +68,6 @@ class MainActivity : AppCompatActivity() {
         if (options.createKey) createKey()
         if (gateActive) return
         options.autoAuth?.let { authenticate(it) }
-    }
-
-    // ---------------------------------------------------------------- device state
-
-    private fun refreshDeviceState() {
-        val manager = BiometricManager.from(this)
-        binding.apiLevelValue.text = Build.VERSION.SDK_INT.toString()
-        binding.canAuthenticateStrongValue.text =
-            AuthOutcome.canAuthenticateName(manager.canAuthenticate(BIOMETRIC_STRONG))
-        binding.canAuthenticateWeakValue.text =
-            AuthOutcome.canAuthenticateName(manager.canAuthenticate(BIOMETRIC_WEAK))
-        binding.canAuthenticateCredentialValue.text =
-            AuthOutcome.canAuthenticateName(manager.canAuthenticate(DEVICE_CREDENTIAL))
-        binding.keystoreKeyValue.text = if (KeystoreStore.hasKey()) "PRESENT" else "ABSENT"
     }
 
     // ---------------------------------------------------------------- authentication
@@ -209,14 +192,12 @@ class MainActivity : AppCompatActivity() {
         runCatching { KeystoreStore.createKey() }
             .onSuccess { setStatus(AuthOutcome.IDLE, "keystore key created") }
             .onFailure { setStatus(AuthOutcome.ERROR, "keystore create failed: $it") }
-        refreshDeviceState()
     }
 
     private fun deleteKey() {
         runCatching { KeystoreStore.deleteKey() }
             .onSuccess { setStatus(AuthOutcome.IDLE, "keystore key deleted") }
             .onFailure { setStatus(AuthOutcome.ERROR, "keystore delete failed: $it") }
-        refreshDeviceState()
     }
 
     // ---------------------------------------------------------------- rendering
