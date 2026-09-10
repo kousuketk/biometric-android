@@ -70,11 +70,6 @@
             <Button android:id="@+id/auth_weak_button" style="@style/Action" android:text="Weak (Class 2)" />
             <Button android:id="@+id/auth_strong_or_credential_button" style="@style/Action" android:text="Biometrics or device credential" />
 
-            <TextView style="@style/SectionHeader" android:text="Keystore" />
-
-            <Button android:id="@+id/keystore_create_button" style="@style/Action" android:text="Create key" />
-            <Button android:id="@+id/keystore_delete_button" style="@style/Action" android:text="Delete key" />
-
             <TextView style="@style/SectionHeader" android:text="Launch gate" />
 
             <CheckBox

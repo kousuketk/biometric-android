@@ -45,8 +45,6 @@ class MainActivity : AppCompatActivity() {
         binding.authStrongOrCredentialButton.setOnClickListener {
             authenticate(AuthMode.STRONG_OR_CREDENTIAL)
         }
-        binding.keystoreCreateButton.setOnClickListener { createKey() }
-        binding.keystoreDeleteButton.setOnClickListener { deleteKey() }
 
         binding.gateToggle.isChecked = gateEnabledPreference
         binding.gateToggle.setOnCheckedChangeListener { _, checked -> gateEnabledPreference = checked }
@@ -64,8 +62,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyLaunchOptions() {
-        if (options.deleteKey) deleteKey()
-        if (options.createKey) createKey()
         if (gateActive) return
         options.autoAuth?.let { authenticate(it) }
     }
@@ -82,6 +78,9 @@ class MainActivity : AppCompatActivity() {
                 if (!KeystoreStore.hasKey()) KeystoreStore.createKey()
                 BiometricPrompt.CryptoObject(KeystoreStore.encryptCipher())
             } catch (e: KeystoreStore.KeyInvalidatedException) {
+                // Enrolling a biometric invalidates the key, so the next attempt would be stuck on
+                // this forever. Report it, but drop the key so a retry starts from a usable one.
+                KeystoreStore.deleteKey()
                 finishWith(AuthOutcome.KEY_INVALIDATED, "mode=$mode ${e.cause}")
                 return
             } catch (e: Exception) {
@@ -186,19 +185,6 @@ class MainActivity : AppCompatActivity() {
         BiometricPrompt(this, ContextCompat.getMainExecutor(this), callback).authenticate(info)
     }
 
-    // ---------------------------------------------------------------- keystore
-
-    private fun createKey() {
-        runCatching { KeystoreStore.createKey() }
-            .onSuccess { setStatus(AuthOutcome.IDLE, "keystore key created") }
-            .onFailure { setStatus(AuthOutcome.ERROR, "keystore create failed: $it") }
-    }
-
-    private fun deleteKey() {
-        runCatching { KeystoreStore.deleteKey() }
-            .onSuccess { setStatus(AuthOutcome.IDLE, "keystore key deleted") }
-            .onFailure { setStatus(AuthOutcome.ERROR, "keystore delete failed: $it") }
-    }
 
     // ---------------------------------------------------------------- rendering
 

@@ -10,8 +10,6 @@ import android.content.Intent
  *
  *   auto_auth  STRONG | STRONG_CRYPTO | WEAK | STRONG_OR_CREDENTIAL
  *   gate       true / false -- force the launch gate for this run
- *   create_key true       -- create the Keystore key on launch
- *   delete_key true       -- delete the Keystore key on launch
  *   confirmation false    -- drop the extra "Confirm" tap that passive modalities require
  */
 class LaunchOptions(private val intent: Intent) {
@@ -24,9 +22,7 @@ class LaunchOptions(private val intent: Intent) {
     val forcedGate: Boolean?
         get() = if (intent.hasExtra("gate")) intent.getBooleanExtra("gate", false) else null
 
-    val createKey: Boolean get() = intent.getBooleanExtra("create_key", false)
 
-    val deleteKey: Boolean get() = intent.getBooleanExtra("delete_key", false)
 
     /**
      * Face is a passive modality, so BiometricPrompt asks the user to tap "Confirm" by default.
